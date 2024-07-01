@@ -14,9 +14,9 @@ from langchain_community.chat_message_histories import ChatMessageHistory
 from langchain_community.chat_message_histories import StreamlitChatMessageHistory
 
 # Set environment variables
-os.environ['PINECONE_API_KEY'] = '81401caf-7ceb-4cf2-b38f-4f57374b8ec8'
-os.environ['OPENAI_API_KEY'] = "sk-br-infotech-ddO9Biqt05Y8wc1sKlf7T3BlbkFJ5v5dtLdqf5H65NNDpqxl"
-os.environ['LANGCHAIN_API_KEY'] = "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"
+os.environ['PINECONE_API_KEY'] = 'PINECONE_API_KEY'
+os.environ['OPENAI_API_KEY'] = "OPENAI_API_KEY"
+os.environ['LANGCHAIN_API_KEY'] = "LANGCHAIN_API_KEY"
 os.environ["LANGCHAIN_TRACING_V2"] = "true"
 
 session_id = str(uuid.uuid4())
