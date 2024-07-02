@@ -10,9 +10,9 @@ from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
-os.environ['PINECONE_API_KEY'] = '81401caf-7ceb-4cf2-b38f-4f57374b8ec8'  # Replace with your actual Pinecone API key
-key_az="6ba3839d3bcd40beb8d81cf3d9255677"
-end="https://rishil123.cognitiveservices.azure.com/"
+os.environ['PINECONE_API_KEY'] = 'PINECONE_API_KEY'  # Replace with your actual Pinecone API key
+key_az="key_az"
+end="end"
 # Initialize Pinecone client
 pc = Pineconex(api_key=os.getenv('81401caf-7ceb-4cf2-b38f-4f57374b8ec8'))
 analysis_features = ["ocrHighResolution"]
