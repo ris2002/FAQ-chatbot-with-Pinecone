@@ -3,9 +3,9 @@ from langchain_pinecone import PineconeVectorStore
 import streamlit as st
 from pinecone import Pinecone as Pineconex, ServerlessSpec
 
-os.environ['PINECONE_API_KEY'] = '81401caf-7ceb-4cf2-b38f-4f57374b8ec8'
+os.environ['PINECONE_API_KEY'] = 'PINECONE_API_KEY'
 
-pc = Pineconex(api_key=os.getenv('81401caf-7ceb-4cf2-b38f-4f57374b8ec8'))
+pc = Pineconex(api_key=os.getenv('PINECONE_API_KEY'))
 
 
 
