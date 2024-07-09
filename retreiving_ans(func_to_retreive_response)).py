@@ -20,6 +20,8 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
 from langchain_huggingface import HuggingFaceEndpoint
 import asyncio
 from langchain.chains import ConversationChain
+import requests
+from ratelimit import limits, sleep_and_retry
 
 # Set environment variables
 os.environ['PINECONE_API_KEY'] = '81401caf-7ceb-4cf2-b38f-4f57374b8ec8'
@@ -38,14 +40,26 @@ session_id = str(uuid.uuid4())
 def run_query(retrieval_chain, input_text):
     st.write('run query')
     try:
-        # Generate a response using the retrieval chain
-    
-        response =  retrieval_chain.invoke(
-            {"input": input_text},
-            config={"configurable": {"session_id": f'{session_id}'}}
-        )
-        
-        return response['answer']
+        # Retry logic with exponential backoff
+        max_retries = 5
+        retry_delay = 1  # Initial delay in seconds
+
+        for attempt in range(max_retries):
+            try:
+                # Generate a response using the retrieval chain
+                time.sleep(60)
+                response = retrieval_chain.invoke(
+                    {"input": input_text},
+                    config={"configurable": {"session_id": f'{session_id}'}}
+                )
+                return response['answer']
+            except requests.exceptions.RateLimitError as e:
+                print(f"Rate limit exceeded. Retrying in {retry_delay} seconds...")
+                time.sleep(retry_delay)
+                retry_delay *= 2  # Exponential backoff
+        else:
+            st.error("Failed to retrieve response after multiple attempts.")
+            return None
     except KeyError as e:
         st.error(f"KeyError occurred: {e}. Check the response structure.")
         return None
@@ -105,7 +119,7 @@ def initialize(index_name):
     # Wrap the retrieval chain with RunnableWithMessageHistory
     conversational_ans_retrieval = RunnableWithMessageHistory(
         ans_retrieval,
-        lambda session_id: StreamlitChatMessageHistory(key=session_id),
+        lambda session_id: get_session_history(session_id),
         input_messages_key="input",
         history_messages_key="chat_history",
         output_messages_key="answer"
