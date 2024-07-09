@@ -25,7 +25,7 @@ async def extract_embeddings_upload_index(pdf_path, index_name):
 
     async def load_pdf(pdf_path):
         loader = AzureAIDocumentIntelligenceLoader(
-            api_key="167f20e5ce49431aad891c46e2268696",
+            api_key="507d4338f5ce4221a4ef5d3befd6a37f",
             file_path=pdf_path,
             api_endpoint="https://rx11.cognitiveservices.azure.com/",
             api_model="prebuilt-layout",
