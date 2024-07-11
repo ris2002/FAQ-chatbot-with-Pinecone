@@ -49,7 +49,7 @@ def run_query(retrieval_chain, input_text):
                 # Generate a response using the retrieval chain
                 time.sleep(60)
                 response = retrieval_chain.invoke(
-                    {"input": input_text},
+                    {"input": input_text, "chat_history": st.session_state.flow_msg},
                     config={"configurable": {"session_id": f'{session_id}'}}
                 )
                 return response['answer']
@@ -70,11 +70,14 @@ def ini_embed():
 
 def ini_prompt():
     prompt = ChatPromptTemplate.from_template('''
-        You are an AI assistant with expertise in {context}, specifically focusing on the provided manual.
-        What you should do is study the manual carefully and answer to the questions accordingly.
-        The user will ask only questions related to the {context} and its topics.
-        If you feel the question asked is unrelated to {context} or its topics do not answer it.
-        If the user asks what the context is, just give the summary of the {context}.
+       The {context} consists of course curriculm of UNDERGRADUATE PROGRAMME B.Tech. of NATIONAL INSTITUTE OF TECHNOLOGY KARNATAKA, SURATHKAL
+SRINIVASNAGAR PO, MANGALORE 575 025 KARNATAKA, INDIA.Curriculm means it consists of Regulations (General) of the college ,Regulations of  UG,
+Forms & Formats of UG, Course Structure of UG and Course Contents of  UG. Your job is to guide the student based on his/her intersted course and make their decision process easier.
+                                              The user only asks regading the {context}.
+                                              It is important to give the contact details of clgis he or she feels the need to contact the the clg.
+
+
+
 
         <context>{context}</context>  
         Question: {input}
