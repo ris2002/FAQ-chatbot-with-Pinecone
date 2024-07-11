@@ -7,6 +7,7 @@ from langchain.schema import HumanMessage,SystemMessage,AIMessage
 from langchain_community.chat_message_histories import ChatMessageHistory
 from langchain_core.chat_history import BaseChatMessageHistory
 from langchain_core.runnables.history import RunnableWithMessageHistory
+import asyncio
 
 
 
@@ -22,6 +23,14 @@ def get_bot(index_name):
 def clear_cache_session():
     st.session_state.clear()
     st.cache_resource.clear()
+
+async def type_text(container, text, delay=0.05):
+    full_text = ""
+    for char in text:
+        full_text += char
+        container.markdown(full_text)
+        await asyncio.sleep(delay)
+    
 
 def run_chat(ans_retrieval):
     st.write("Chatbot-For everyone")
@@ -41,12 +50,21 @@ def run_chat(ans_retrieval):
         st.session_state.conversation.append((input_text, res))
     
     convo_placeholder = st.container()
+   #The loop checks if the current message is the last one in the conversation (i == len(st.session_state['conversation']) - 1).
+      #If it is, it applies the typing effect using asyncio.run(type_text(placeholder, f"AI assistant: {ai_msg}")).
+#For all other messages, it directly writes the full message.
     with convo_placeholder:
-        for user_msg, ai_msg in st.session_state['conversation']:
+        for i, (user_msg, ai_msg) in enumerate(st.session_state['conversation']):
             with st.chat_message("user"):
                 st.write(f"You: {user_msg}")
-            with st.chat_message("assistant"):
-                st.write(f"AI assistant: {ai_msg}")
+
+            if ai_msg is not None:
+                with st.chat_message("assistant"):
+                    if i==len(st.session_state['conversation'])-1:
+                        placeholder=st.empty()
+                        asyncio.run(type_text(placeholder, f"AI assistant: {ai_msg}"))
+                    else:
+                        st.write(f"AI assistant: {ai_msg}")
                 
             
 
