@@ -1,0 +1,159 @@
+import os
+import uuid
+import time
+import streamlit as st
+from pinecone import *
+from langchain_pinecone import PineconeVectorStore
+from langchain.chains.combine_documents import create_stuff_documents_chain
+from langchain.chains import create_retrieval_chain
+from langchain_core.prompts import ChatPromptTemplate,MessagesPlaceholder
+from langchain_openai import ChatOpenAI
+from langchain_community.embeddings import OpenAIEmbeddings
+from langchain_core.chat_history import BaseChatMessageHistory
+from langchain_core.runnables.history import RunnableWithMessageHistory
+from langchain_community.chat_message_histories import ChatMessageHistory
+from langchain_community.chat_message_histories import StreamlitChatMessageHistory
+from langchain_groq import ChatGroq
+from langchain_community.llms import Ollama
+from langchain_huggingface import HuggingFacePipeline
+from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
+from langchain_huggingface import HuggingFaceEndpoint
+import asyncio
+from langchain.chains import ConversationChain
+import requests
+from ratelimit import limits, sleep_and_retry
+from langchain.chains import create_history_aware_retriever
+
+# Set environment variables
+os.environ['PINECONE_API_KEY'] = '81401caf-7ceb-4cf2-b38f-4f54b8ec8'
+os.environ['OPENAI_API_KEY'] = "sk-br-infotech-ddO9Biqt05Y8wc1sKlBlbkFJ5v5dtLdqf5H65NNDpqxl"
+os.environ['LANGCHAIN_API_KEY'] = "lsv2_pt_ed77deb9767847868ef4771b97\\\9d113f_9d5f4fd170"
+os.environ["LANGCHAIN_TRACING_V2"] = "true"
+
+os.environ["hugging_face_repo"]="hf_TSiQXbDwpmiqGdtcpoyihRZihqGYteh"
+
+session_id = str(uuid.uuid4())
+
+
+
+     
+
+def run_query(retrieval_chain, input_text):
+    st.write('run query')
+    try:
+        # Retry logic with exponential backoff
+        max_retries = 5
+        retry_delay = 1  # Initial delay in seconds
+
+        for attempt in range(max_retries):
+            try:
+                # Generate a response using the retrieval chain
+                time.sleep(60)
+                response = retrieval_chain.invoke(
+                    {"input": input_text},
+                    config={"configurable": {"session_id": f'{session_id}'}}
+                )['answer']
+                return response
+            except requests.exceptions.HTTPError as e:
+                print(f"Rate limit exceeded. Retrying in {retry_delay} seconds...")
+                time.sleep(retry_delay)
+                retry_delay *= 2  # Exponential backoff
+        else:
+            st.error("Failed to retrieve response after multiple attempts.")
+            return None
+    except KeyError as e:
+        st.error(f"KeyError occurred: {e}. Check the response structure.")
+        return None
+
+def ini_embed():
+    embeddings = OpenAIEmbeddings(model='text-embedding-ada-002')
+    return embeddings
+
+
+def get_session_history(session_id: str) -> BaseChatMessageHistory:
+        print('Session_chat')
+        
+        print(StreamlitChatMessageHistory(key=session_id))
+        
+        return StreamlitChatMessageHistory(key=session_id)
+
+def initialize(index_name):
+    embeddings = ini_embed()
+    print('11')
+    dbx = PineconeVectorStore.from_existing_index(index_name=index_name, embedding=embeddings)
+    print('12')
+    llm = ChatOpenAI(model='gpt-4o', temperature=0.5, max_tokens=3000)
+    
+   # model_id="meta-llama/Meta-Llama-3-8B"
+   #model=AutoModelForCausalLM.from_pretrained(model_id)
+    #tokenizer=AutoTokenizer.from_pretrained(model)
+    #pipe=pipeline("text-generation",model=model,tokenizer=tokenizer,max_new_tokens=5000)
+    #repo_id="meta-llama/Llama-2-7b-hf"
+    system_prompt = (
+    "You are an assistant for question-answering tasks. "
+    "Use the following pieces of retrieved context to answer "
+    "the question. If you don't know the answer, say that you "
+    "don't know. Use three sentences maximum and keep the "
+    "answer concise."
+    " If asked for previous question give summary from chat history"
+     
+    "\n\n"
+    "{context}"
+)
+
+    print('13')
+    prompt =  prompt = ChatPromptTemplate.from_messages([("system",system_prompt),MessagesPlaceholder("flow_msg"),("human", "{input}"),])
+    print('14')
+    doc_chain = create_stuff_documents_chain(llm, prompt)
+    print('15')
+    contextualize_q_system_prompt = (
+    "Given a chat history and the latest user question "
+    "which might reference context in the chat history, "
+    "formulate a standalone question which can be understood "
+    "without the chat history. Do NOT answer the question, "
+    "just reformulate it if needed and otherwise return it as is."
+    "If asked for previous question give summary from chat history"
+)
+    
+    retriever = dbx.as_retriever()
+    contextualize_q_prompt = ChatPromptTemplate.from_messages(
+    [
+        ("system", contextualize_q_system_prompt),
+        MessagesPlaceholder("chat_history"),
+        ("human", "{input}"),
+    ]
+)
+    print('16')
+    history_aware_retriever = create_history_aware_retriever(
+    llm, retriever, contextualize_q_prompt
+)
+
+    ans_retrieval = create_retrieval_chain(history_aware_retriever, doc_chain)
+    print('17')
+
+    
+
+        
+    
+    # Wrap the retrieval chain with RunnableWithMessageHistory
+    conversational_ans_retrieval = RunnableWithMessageHistory(
+        ans_retrieval,
+        lambda session_id: get_session_history(session_id),
+        input_messages_key="input",
+        output_messages_key="output",
+        history_messages_key="flow_msg",)
+        
+        
+ 
+    print('17')
+    
+    print(session_id)
+    print('18')
+    
+
+    print('conversational_ans_retrieval***************************************************************************************************')
+    print(get_session_history(session_id))
+    
+    
+
+    return conversational_ans_retrieval
