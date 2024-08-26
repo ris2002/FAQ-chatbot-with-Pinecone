@@ -1,142 +1,135 @@
-import os
-import uuid
-import time
-import streamlit as st
 from pinecone import *
 from langchain_pinecone import PineconeVectorStore
+import streamlit as st
+from pinecone import Pinecone as Pineconex, ServerlessSpec
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain.chains import create_retrieval_chain
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from langchain_community.embeddings import OpenAIEmbeddings
-from langchain_core.chat_history import BaseChatMessageHistory
-from langchain_core.runnables.history import RunnableWithMessageHistory
-from langchain_community.chat_message_histories import ChatMessageHistory
+from langchain_pinecone import PineconeVectorStore
+from langchain_core.prompts import SystemMessagePromptTemplate, HumanMessagePromptTemplate,MessagesPlaceholder
 from langchain_community.chat_message_histories import StreamlitChatMessageHistory
-from langchain_groq import ChatGroq
-from langchain_community.llms import Ollama
-from langchain_huggingface import HuggingFacePipeline
-from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
-from langchain_huggingface import HuggingFaceEndpoint
-import asyncio
+from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain.chains import ConversationChain
-import requests
-from ratelimit import limits, sleep_and_retry
 
-# Set environment variables
-os.environ['PINECONE_API_KEY'] = '81401caf-7ceb-4cf2-b38f-4f57374b8ec8'
-os.environ['OPENAI_API_KEY'] = "sk-br-infotech-ddO9Biqt05Y8wc1sKlf7T3BlbkFJ5v5dtLdqf5H65NNDpqxl"
-os.environ['LANGCHAIN_API_KEY'] = "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"
+from langchain.chains.conversation.memory import ConversationBufferMemory
+from langchain_community.chat_message_histories import RedisChatMessageHistory
+from langchain_core.chat_history import BaseChatMessageHistory
+
+from langchain_community.chat_message_histories import ChatMessageHistory
+
+open_api_key = os.getenv('OPENAI_API_KEY')
+langchain_key = os.getenv('LANGCHAIN_API_KEY')
+//all keys are wrong
+os.environ['PINECONE_API_KEY'] = '81401caf-7ceb-4cf2-b38fdgfsg-4f57374b8ec8'
+os.environ['OPENAI_API_KEY'] = "sk-br-infotech-ddO9Biqt05Yfgf8wc1sKlf7T3BlbkFJ5v5dtLdqf5H65NNDpqxl"
+os.environ['LANGCHAIN_API_KEY'] = "lsv2_pt_ed77deb976784gfgf563657868ef4771b979d113f_9d5f4fd170"
 os.environ["LANGCHAIN_TRACING_V2"] = "true"
 
-os.environ["hugging_face_repo"]="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"
 
-session_id = str(uuid.uuid4())
-
-
-
-     
 
 def run_query(retrieval_chain, input_text):
     st.write('run query')
+    st.chat_message("human").write(input_text)
+    
     try:
-        # Retry logic with exponential backoff
-        max_retries = 5
-        retry_delay = 1  # Initial delay in seconds
+        # Retrieve the session key from session state
+        keys = st.session_state['session_key']
+        
+        # Initialize StreamlitChatMessageHistory only once
+        
+            
+        
+        mgs=StreamlitChatMessageHistory(key=keys)
+        
+        
+        # Prepare input with history
+        #input_with_history = [{"role": msg.type, "content": msg.content} for msg in mgs.] + [{"role": "user", "content": input_text}]
+        
+        # Generate a response using the retrieval chain
+        config = {"configurable": {"session_id": keys}}
+        print('fddsgsdg')
+        
+        response = retrieval_chain.invoke({'input':input_text}, config=config)
+        print('sfgfgfdsgvd')
+        
+        # Display AI response
+        st.chat_message("ai").write(response['answer'])
+        
+        # Add user and AI messages to history
+        mgs.add_user_message(input_text)
+        mgs.add_ai_message(response['answer'])
 
-        for attempt in range(max_retries):
-            try:
-                # Generate a response using the retrieval chain
-                time.sleep(60)
-                response = retrieval_chain.invoke(
-                    {"input": input_text, "chat_history": st.session_state.flow_msg},
-                    config={"configurable": {"session_id": f'{session_id}'}}
-                )
-                return response['answer']
-            except requests.exceptions.RateLimitError as e:
-                print(f"Rate limit exceeded. Retrying in {retry_delay} seconds...")
-                time.sleep(retry_delay)
-                retry_delay *= 2  # Exponential backoff
-        else:
-            st.error("Failed to retrieve response after multiple attempts.")
-            return None
+        return response['answer']
     except KeyError as e:
         st.error(f"KeyError occurred: {e}. Check the response structure.")
         return None
 
+
 def ini_embed():
-    embeddings = OpenAIEmbeddings(model='text-embedding-ada-002')
-    return embeddings
-
+      embeddings = OpenAIEmbeddings(model='text-embedding-ada-002')
+      return embeddings
 def ini_prompt():
-    prompt = ChatPromptTemplate.from_template('''
-       The {context} consists of course curriculm of UNDERGRADUATE PROGRAMME B.Tech. of NATIONAL INSTITUTE OF TECHNOLOGY KARNATAKA, SURATHKAL
-SRINIVASNAGAR PO, MANGALORE 575 025 KARNATAKA, INDIA.Curriculm means it consists of Regulations (General) of the college ,Regulations of  UG,
-Forms & Formats of UG, Course Structure of UG and Course Contents of  UG. Your job is to guide the student based on his/her intersted course and make their decision process easier.
-                                              The user only asks regading the {context}.
-                                              It is important to give the contact details of clgis he or she feels the need to contact the the clg.
+     
+        system_msg=SystemMessagePromptTemplate.from_template(
+        "You are an AI assistant with expertise in {context}, specifically focusing on the provided manual. "
+        "Carefully study the manual, particularly chapters or sections related to {context}. "
+        "Your responses should be concise, precise, and directly related to {context}. "
+        "The user will ask questions related to {context} and its topics only. "
+        "If a question is only partially related, clarify the ambiguity and focus on the most relevant aspects. "
+        "If the question is unrelated to {context}, politely indicate that it's outside the scope of the manual. "
+        "If the user asks what the context is, provide a brief summary of the {context}." )
+        human_msg=HumanMessagePromptTemplate.from_template("Question: {input}")
+        prompt=ChatPromptTemplate.from_messages([system_msg,MessagesPlaceholder(variable_name="history"),human_msg])
+        return prompt 
 
 
+          
+     
+def get_session_history(key: str) -> BaseChatMessageHistory:
+    if "chat_history" not in st.session_state:
+        st.session_state["chat_history"] = ChatMessageHistory()
+    return st.session_state["chat_history"]
+     
 
-
-        <context>{context}</context>  
-        Question: {input}
-    ''')
-    return prompt
-
-
-def get_session_history(session_id: str) -> BaseChatMessageHistory:
-        print('Session_chat')
-        
-        print(StreamlitChatMessageHistory(key=session_id))
-        
-        return StreamlitChatMessageHistory(key=session_id)
 
 def initialize(index_name):
-    embeddings = ini_embed()
-    print('11')
-    dbx = PineconeVectorStore.from_existing_index(index_name=index_name, embedding=embeddings)
-    print('12')
-    llm = ChatOpenAI(model='gpt-4o', temperature=0.5, max_tokens=3000)
     
-   # model_id="meta-llama/Meta-Llama-3-8B"
-   #model=AutoModelForCausalLM.from_pretrained(model_id)
-    #tokenizer=AutoTokenizer.from_pretrained(model)
-    #pipe=pipeline("text-generation",model=model,tokenizer=tokenizer,max_new_tokens=5000)
-    #repo_id="meta-llama/Llama-2-7b-hf"
-
-    print('13')
-    prompt = ini_prompt()
-    print('14')
-    doc_chain = create_stuff_documents_chain(llm, prompt)
-    print('15')
-    retriever = dbx.as_retriever()
-    print('16')
-    ans_retrieval = create_retrieval_chain(retriever, doc_chain)
-    print('17')
-
-    
-
         
-    
-    # Wrap the retrieval chain with RunnableWithMessageHistory
-    conversational_ans_retrieval = RunnableWithMessageHistory(
-        ans_retrieval,
-        lambda session_id: get_session_history(session_id),
-        input_messages_key="input",
-        history_messages_key="chat_history",
-        output_messages_key="answer"
+        st.write('model')
+
+        embeddings = ini_embed()
+        st.write('model1')
+        dbx = PineconeVectorStore.from_existing_index(index_name=index_name, embedding=embeddings)
+        st.write('model2')
+        llm = ChatOpenAI(model='gpt-4o', temperature=0.5,max_tokens=3000)
+        st.write('model3')
+        keys=st.session_state['session_key']
+        mgs=StreamlitChatMessageHistory(key=keys)
+        if len(mgs.messages) == 0:
+
+            mgs.add_ai_message("How can I help you?")
+
+        prompt = ini_prompt()
+        st.write('model4')
+        doc_chain = create_stuff_documents_chain(llm, prompt)
+        #conv_chain=ConversationChain(llm=llm,prompt=prompt,memory=ConversationBufferMemory())
+        memory=ConversationBufferMemory(memory_key='history',return_messages=True)
+        st.write('model5')
+        retriever = dbx.as_retriever()
+        st.write('model6')
+        run= create_retrieval_chain(retriever, doc_chain)
+        st.write('model7')
+        ans_retrival=RunnableWithMessageHistory(run,get_session_history,input_messages_key="input",history_messages_key="history",output_messages_key="answer")
         
-    )
-    print('17')
-    
-    print(session_id)
-    print('18')
-    
+        
+        
+        st.write('model8')
+        
+              
+        
 
-    print('conversational_ans_retrieval***************************************************************************************************')
-    print(get_session_history(session_id))
+        return ans_retrival
     
-    
-
-    return conversational_ans_retrieval
+        
